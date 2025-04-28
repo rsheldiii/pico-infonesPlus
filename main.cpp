@@ -27,6 +27,7 @@
 #include <InfoNES_pAPU.h>
 
 #include <dvi/dvi.h>
+#include <dvi/spi_buffer.h>
 #include <tusb.h>
 #include <gamepad.h>
 #include "rom_selector.h"
@@ -60,90 +61,21 @@ namespace
 {
     constexpr uint32_t CPUFreqKHz = 252000;
 
-    constexpr dvi::Config dviConfig_PicoDVI = {
-        .pinTMDS = {10, 12, 14},
-        .pinClock = 8,
-        .invert = true,
-    };
-
-    constexpr dvi::Config dviConfig_PicoDVISock = {
-        .pinTMDS = {12, 18, 16},
-        .pinClock = 14,
-        .invert = false,
-    };
-    // Pimoroni Digital Video, SD Card & Audio Demo Board
-    constexpr dvi::Config dviConfig_PimoroniDemoDVSock = {
-        .pinTMDS = {8, 10, 12},
-        .pinClock = 6,
-        .invert = true,
-    };
-    // Adafruit Feather RP2040 DVI
-    constexpr dvi::Config dviConfig_AdafruitFeatherDVI = {
-        .pinTMDS = {18, 20, 22},
-        .pinClock = 16,
-        .invert = true,
-    };
-    // Waveshare RP2040-PiZero DVI
-    constexpr dvi::Config dviConfig_WaveShareRp2040 = {
-        .pinTMDS = {26, 24, 22},
-        .pinClock = 28,
-        .invert = false,
-    };
-    std::unique_ptr<dvi::DVI> dvi_;
+    std::unique_ptr<spi_buffer::SPI_Buffer> spiBuffer_; 
 
     static constexpr uintptr_t NES_FILE_ADDR = 0x10080000;
 
     ROMSelector romSelector_;
     //
 
-    enum class ScreenMode
-    {
-        SCANLINE_8_7,
-        NOSCANLINE_8_7,
-        SCANLINE_1_1,
-        NOSCANLINE_1_1,
-        MAX,
-    };
-    ScreenMode screenMode_{};
-    // ScreenMode screenMode_ = ScreenMode::SCANLINE_8_7;
-    bool scaleMode8_7_ = true;
-
-    void applyScreenMode()
-    {
-        bool scanLine = false;
-
-        switch (screenMode_)
-        {
-        case ScreenMode::SCANLINE_1_1:
-            scaleMode8_7_ = false;
-            scanLine = true;
-            printf("ScreenMode::SCANLINE_1_1\n");
-            break;
-
-        case ScreenMode::SCANLINE_8_7:
-            scaleMode8_7_ = true;
-            scanLine = true;
-            printf("ScreenMode::SCANLINE_8_7\n");
-            break;
-
-        case ScreenMode::NOSCANLINE_1_1:
-            scaleMode8_7_ = false;
-            scanLine = false;
-            printf("ScreenMode::NOSCANLINE_1_1\n");
-            break;
-
-        case ScreenMode::NOSCANLINE_8_7:
-            scaleMode8_7_ = true;
-            scanLine = false;
-            printf("ScreenMode::NOSCANLINE_8_7\n");
-            break;
-        }
-
-        dvi_->setScanLine(scanLine);
-    }
 }
 
-#define CC(x) (((x >> 1) & 15) | (((x >> 6) & 15) << 4) | (((x >> 11) & 15) << 8))
+// this is to crush RGB555 into RGB444
+// #define CC(x) (((x >> 1) & 15) | (((x >> 6) & 15) << 4) | (((x >> 11) & 15) << 8))
+// this is the identity function lol
+// #define CC(x) (x)
+// this is to take RGB555 and make it RGB565
+#define CC(x) ((((x) & 0x7C00) << 1) | (((x) & 0x03E0) << 1) | ((x) & 0x001F))
 const WORD __not_in_flash_func(NesPalette)[64] = {
     CC(0x39ce), CC(0x1071), CC(0x0015), CC(0x2013), CC(0x440e), CC(0x5402), CC(0x5000), CC(0x3c20),
     CC(0x20a0), CC(0x0100), CC(0x0140), CC(0x00e2), CC(0x0ceb), CC(0x0000), CC(0x0000), CC(0x0000),
@@ -152,7 +84,16 @@ const WORD __not_in_flash_func(NesPalette)[64] = {
     CC(0x7fff), CC(0x1eff), CC(0x2e5f), CC(0x223f), CC(0x79ff), CC(0x7dd6), CC(0x7dcc), CC(0x7e67),
     CC(0x7ae7), CC(0x4342), CC(0x2769), CC(0x2ff3), CC(0x03bb), CC(0x0000), CC(0x0000), CC(0x0000),
     CC(0x7fff), CC(0x579f), CC(0x635f), CC(0x6b3f), CC(0x7f1f), CC(0x7f1b), CC(0x7ef6), CC(0x7f75),
-    CC(0x7f94), CC(0x73f4), CC(0x57d7), CC(0x5bf9), CC(0x4ffe), CC(0x0000), CC(0x0000), CC(0x0000)};
+    CC(0x7f94), CC(0x73f4), CC(0x57d7), CC(0x5bf9), CC(0x4ffe), CC(0x0000), CC(0x0000), CC(0x0000)
+};
+
+// const WORD __not_in_flash_func(NesPalette)[ 64 ] =
+// {
+//   0x39ce, 0x1071, 0x0015, 0x2013, 0x440e, 0x5402, 0x5000, 0x3c20, 0x20a0, 0x0100, 0x0140, 0x00e2, 0x0ceb, 0x0000, 0x0000, 0x0000,
+//   0x5ef7, 0x01dd, 0x10fd, 0x401e, 0x5c17, 0x700b, 0x6ca0, 0x6521, 0x45c0, 0x0240, 0x02a0, 0x0247, 0x0211, 0x0000, 0x0000, 0x0000,
+//   0x7fff, 0x1eff, 0x2e5f, 0x223f, 0x79ff, 0x7dd6, 0x7dcc, 0x7e67, 0x7ae7, 0x4342, 0x2769, 0x2ff3, 0x03bb, 0x0000, 0x0000, 0x0000,
+//   0x7fff, 0x579f, 0x635f, 0x6b3f, 0x7f1f, 0x7f1b, 0x7ef6, 0x7f75, 0x7f94, 0x73f4, 0x57d7, 0x5bf9, 0x4ffe, 0x0000, 0x0000, 0x0000
+// };
 
 uint32_t getCurrentNVRAMAddr()
 {
@@ -335,13 +276,6 @@ bool loadNVRAM()
     SRAMwritten = false;
     return ok;
 }
-
-void screenMode(int incr)
-{
-    screenMode_ = static_cast<ScreenMode>((static_cast<int>(screenMode_) + incr) & 3);
-    applyScreenMode();
-}
-
 static DWORD prevButtons[2]{};
 static int rapidFireMask[2]{};
 static int rapidFireCounter = 0;
@@ -440,11 +374,11 @@ void InfoNES_PadState(DWORD *pdwPad1, DWORD *pdwPad2, DWORD *pdwSystem)
             }
             if (pushed & UP)
             {
-                screenMode(-1);
+                // screenMode(-1);
             }
             else if (pushed & DOWN)
             {
-                screenMode(+1);
+                // screenMode(+1);
             }
         }
 
@@ -527,52 +461,16 @@ void InfoNES_SoundClose()
 
 int __not_in_flash_func(InfoNES_GetSoundBufferSize)()
 {
-    return dvi_->getAudioRingBuffer().getFullWritableSize();
+    return 0; // dvi_->getAudioRingBuffer().getFullWritableSize();
 }
 
 void __not_in_flash_func(InfoNES_SoundOutput)(int samples, BYTE *wave1, BYTE *wave2, BYTE *wave3, BYTE *wave4, BYTE *wave5)
 {
-    while (samples)
-    {
-        auto &ring = dvi_->getAudioRingBuffer();
-        auto n = std::min<int>(samples, ring.getWritableSize());
-        if (!n)
-        {
-            return;
-        }
-        auto p = ring.getWritePointer();
-
-        int ct = n;
-        while (ct--)
-        {
-            int w1 = *wave1++;
-            int w2 = *wave2++;
-            int w3 = *wave3++;
-            int w4 = *wave4++;
-            int w5 = *wave5++;
-            //            w3 = w2 = w4 = w5 = 0;
-            int l = w1 * 6 + w2 * 3 + w3 * 5 + w4 * 3 * 17 + w5 * 2 * 32;
-            int r = w1 * 3 + w2 * 6 + w3 * 5 + w4 * 3 * 17 + w5 * 2 * 32;
-            *p++ = {static_cast<short>(l), static_cast<short>(r)};
-
-            // pulse_out = 0.00752 * (pulse1 + pulse2)
-            // tnd_out = 0.00851 * triangle + 0.00494 * noise + 0.00335 * dmc
-
-            // 0.00851/0.00752 = 1.131648936170213
-            // 0.00494/0.00752 = 0.6569148936170213
-            // 0.00335/0.00752 = 0.4454787234042554
-
-            // 0.00752/0.00851 = 0.8836662749706228
-            // 0.00494/0.00851 = 0.5804935370152762
-            // 0.00335/0.00851 = 0.3936545240893067
-        }
-
-        ring.advanceWritePointer(n);
-        samples -= n;
-    }
+    return;
 }
 
 extern WORD PC;
+static uint16_t frame = 0;
 
 uint32_t time_us()
 {
@@ -585,8 +483,8 @@ int InfoNES_LoadFrame()
 #if NES_PIN_CLK != -1
     nespad_read_start();
 #endif
-    auto count = dvi_->getFrameCounter();
-    auto onOff = hw_divider_s32_quotient_inlined(count, 60) & 1;
+    // auto count = dvi_->getFrameCounter();
+    auto onOff = hw_divider_s32_quotient_inlined(frame, 60) & 1;
 #if LED_GPIO_PIN != -1
     gpio_put(LED_GPIO_PIN, onOff);
 #endif
@@ -602,12 +500,12 @@ int InfoNES_LoadFrame()
         fps = (1000000 - 1) / tick_us + 1;
         start_tick_us = time_us();
     }
-    return count;
+    return frame;
 }
 
 namespace
 {
-    dvi::DVI::LineBuffer *currentLineBuffer_{};
+    spi_buffer::SPI_Buffer::LineBuffer *currentLineBuffer_{};
 }
 
 void __not_in_flash_func(drawWorkMeterUnit)(int timing,
@@ -648,14 +546,14 @@ void __not_in_flash_func(drawWorkMeter)(int line)
 void __not_in_flash_func(InfoNES_PreDrawLine)(int line)
 {
     util::WorkMeterMark(0xaaaa);
-    auto b = dvi_->getLineBuffer();
+    auto b = spiBuffer_->getLineBuffer();
     util::WorkMeterMark(0x5555);
     // b.size --> 640
     // printf("Pre Draw%d\n", b->size());
     // WORD = 2 bytes
     // b->size = 640
     // printf("%d\n", b->size());
-    InfoNES_SetLineBuffer(b->data() + 32, b->size());
+    InfoNES_SetLineBuffer(b->data(), b->size());
     //    (*b)[319] = line + dvi_->getFrameCounter();
 
     currentLineBuffer_ = b;
@@ -664,7 +562,7 @@ void __not_in_flash_func(InfoNES_PreDrawLine)(int line)
 void __not_in_flash_func(RomSelect_PreDrawLine)(int line)
 {
     util::WorkMeterMark(0xaaaa);
-    auto b = dvi_->getLineBuffer();
+    auto b = spiBuffer_->getLineBuffer();
     util::WorkMeterMark(0x5555);
     // b.size --> 640
     // printf("Pre Draw%d\n", b->size());
@@ -717,7 +615,21 @@ void __not_in_flash_func(InfoNES_PostDrawLine)(int line)
         }
     }
     assert(currentLineBuffer_);
-    dvi_->setLineBuffer(line, currentLineBuffer_);
+    // if (line <= 8) {
+    //     I_handleFrameStart(frame);
+    // } 
+
+
+    // I_handleScanline(currentLineBuffer_->data(), line-8);
+    // // if (line % 3 == 0) {
+    // //     I_handleScanline(currentLineBuffer_->data(), line/3);
+    // // }
+    
+    // if (line == 239) {
+    //     I_handleFrameEnd(frame++);
+    // }
+        
+    spiBuffer_->setLineBuffer(line, currentLineBuffer_);
     currentLineBuffer_ = nullptr;
 }
 
@@ -760,84 +672,8 @@ void __not_in_flash_func(core1_main)()
 {
     while (true)
     {
-        dvi_->registerIRQThisCore();
-        dvi_->waitForValidLine();
-
-        dvi_->start();
-        while (!exclProc_.isExist())
-        {
-            if (scaleMode8_7_)
-            {
-                // Default
-                dvi_->convertScanBuffer12bppScaled16_7(34, 32, 288 * 2);
-
-                // 34 + 252 + 34
-                // 32 + 576 + 32
-            }
-            else
-            {
-                //
-                dvi_->convertScanBuffer12bpp();
-            }
-        }
-
-        dvi_->unregisterIRQThisCore();
-        dvi_->stop();
-
-        exclProc_.processOrWaitIfExist();
+        spiBuffer_->spi_task();
     }
-}
-
-bool initSDCard()
-{
-    FRESULT fr;
-    TCHAR str[40];
-    sleep_ms(1000);
-
-    printf("Mounting SDcard");
-    fr = f_mount(&fs, "", 1);
-    if (fr != FR_OK)
-    {
-        snprintf(ErrorMessage, ERRORMESSAGESIZE, "SD card mount error: %d", fr);
-        printf("%s\n", ErrorMessage);
-        return false;
-    }
-    printf("\n");
-
-    fr = f_chdir("/");
-    if (fr != FR_OK)
-    {
-        snprintf(ErrorMessage, ERRORMESSAGESIZE, "Cannot change dir to / : %d", fr);
-        printf("%s\n", ErrorMessage);
-        return false;
-    }
-    // for f_getcwd to work, set
-    //   #define FF_FS_RPATH		2
-    // in drivers/fatfs/ffconf.h
-    fr = f_getcwd(str, sizeof(str));
-    if (fr != FR_OK)
-    {
-        snprintf(ErrorMessage, ERRORMESSAGESIZE, "Cannot get current dir: %d", fr);
-        printf("%s\n", ErrorMessage);
-        return false;
-    }
-    printf("Current directory: %s\n", str);
-    printf("Creating directory %s\n", GAMESAVEDIR);
-    fr = f_mkdir(GAMESAVEDIR);
-    if (fr != FR_OK)
-    {
-        if (fr == FR_EXIST)
-        {
-            printf("Directory already exists.\n");
-        }
-        else
-        {
-            snprintf(ErrorMessage, ERRORMESSAGESIZE, "Cannot create dir %s: %d", GAMESAVEDIR, fr);
-            printf("%s\n", ErrorMessage);
-            return false;
-        }
-    }
-    return true;
 }
 
 int main()
@@ -859,10 +695,9 @@ int main()
     gpio_put(LED_GPIO_PIN, 1);
 #endif
     tusb_init();
-    isFatalError = !initSDCard();
     // When a game is started from the menu, the menu will reboot the device.
     // After reboot the emulator will start the selected game.
-    if (watchdog_caused_reboot() && isFatalError == false)
+    if (false && watchdog_caused_reboot()) // TODO used to be true || watchdog_caused_reboot(), can't flash new rom without this
     {
         // Determine loaded rom
         printf("Rebooted by menu\n");
@@ -969,56 +804,21 @@ int main()
 
     // util::dumpMemory((void *)NES_FILE_ADDR, 1024);
 
-#if 0
     //
-    auto *i2c = i2c0;
-    static constexpr int I2C_SDA_PIN = 16;
-    static constexpr int I2C_SCL_PIN = 17;
-    i2c_init(i2c, 100 * 1000);
-    gpio_set_function(I2C_SDA_PIN, GPIO_FUNC_I2C);
-    gpio_set_function(I2C_SCL_PIN, GPIO_FUNC_I2C);
-    // gpio_pull_up(I2C_SDA_PIN);
-    // gpio_pull_up(I2C_SCL_PIN);
-    i2c_set_slave_mode(i2c, false, 0);
-
-    {
-        constexpr int addrSegmentPointer = 0x60 >> 1;
-        constexpr int addrEDID = 0xa0 >> 1;
-        constexpr int addrDisplayID = 0xa4 >> 1;
-
-        uint8_t buf[128];
-        int addr = 0;
-        do
-        {
-            printf("addr: %04x\n", addr);
-            uint8_t tmp = addr >> 8;
-            i2c_write_blocking(i2c, addrSegmentPointer, &tmp, 1, false);
-
-            tmp = addr & 255;
-            i2c_write_blocking(i2c, addrEDID, &tmp, 1, true);
-            i2c_read_blocking(i2c, addrEDID, buf, 128, false);
-
-            util::dumpMemory(buf, 128);
-            printf("\n");
-
-            addr += 128;
-        } while (buf[126]); 
-    }
-#endif
-    //
-    dvi_ = std::make_unique<dvi::DVI>(pio0, &DVICONFIG,
-                                      dvi::getTiming640x480p60Hz());
+    // dvi_ = std::make_unique<dvi::DVI>(pio0, &DVICONFIG,
+                                    //   dvi::getTiming640x480p60Hz());
+    spiBuffer_ = std::make_unique<spi_buffer::SPI_Buffer>();
     //    dvi_->setAudioFreq(48000, 25200, 6144);
-    dvi_->setAudioFreq(44100, 28000, 6272);
+    // dvi_->setAudioFreq(44100, 28000, 6272);
 
-    dvi_->allocateAudioBuffer(256);
+    // dvi_->allocateAudioBuffer(256);
     //    dvi_->setExclusiveProc(&exclProc_);
 
-    dvi_->getBlankSettings().top = 4 * 2;
-    dvi_->getBlankSettings().bottom = 4 * 2;
+    // dvi_->getBlankSettings().top = 4 * 2;
+    // dvi_->getBlankSettings().bottom = 4 * 2;
     // dvi_->setScanLine(true);
 
-    applyScreenMode();
+    // applyScreenMode();
 #if NES_PIN_CLK != -1
     nespad_begin(CPUFreqKHz, NES_PIN_CLK, NES_PIN_DATA, NES_PIN_LAT);
 #endif
@@ -1027,7 +827,7 @@ int main()
 #endif
 
     // 空サンプル詰めとく
-    dvi_->getAudioRingBuffer().advanceWritePointer(255);
+    // dvi_->getAudioRingBuffer().advanceWritePointer(255);
 
     multicore_launch_core1(core1_main);
 
@@ -1035,9 +835,9 @@ int main()
     {
         if (strlen(selectedRom) == 0)
         {
-            screenMode_ = ScreenMode::NOSCANLINE_8_7;
-            applyScreenMode();
-            menu(NES_FILE_ADDR, ErrorMessage, isFatalError); // never returns, but reboots upon selecting a game
+            // screenMode_ = ScreenMode::NOSCANLINE_8_7;
+            // applyScreenMode();
+            // menu(NES_FILE_ADDR, ErrorMessage, isFatalError); // never returns, but reboots upon selecting a game
         }
         printf("Now playing: %s\n", selectedRom);
         romSelector_.init(NES_FILE_ADDR);

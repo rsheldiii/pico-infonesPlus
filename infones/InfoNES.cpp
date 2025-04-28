@@ -610,6 +610,8 @@ void InfoNES_Main()
   // Initialize InfoNES
   InfoNES_Init();
 
+
+
   // Main loop
   // while (1)
   // {

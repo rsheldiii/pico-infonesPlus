@@ -532,7 +532,7 @@ void menu(uintptr_t NES_FILE_ADDR, char *errorMessage, bool isFatal)
                     displayRoms(romlister, firstVisibleRowINDEX);
                 }
             }
-            else if ((PAD1_Latch & START) == START && (PAD1_Latch & SELECT) != SELECT)
+            else if (((PAD1_Latch & START) == START && (PAD1_Latch & SELECT) != SELECT))
             {
                 // reboot and start emulator with currently loaded game
                 // Create a file /START indicating not to reflash the already flashed game

@@ -57,6 +57,10 @@ pico_sdk_init()
 # ENDIF()
 add_subdirectory(drivers/fatfs)
 add_subdirectory(drivers/sdcard)
+
+add_subdirectory(pico-screens)
+# add_subdirectory(pico-screens)
+
 if (NOT INFONES_PLUS_HW_CONFIG)
     set(INFONES_PLUS_HW_CONFIG 1 CACHE STRING "Select the hardware configuration for your board")       
 endif()
@@ -148,18 +152,25 @@ add_executable(piconesPlus
     menu.cpp
     RomLister.cpp
     FrensHelpers.cpp
+    pico-screens/screens/shared.c
+    pico-screens/screen.c
+    # pico-screens/screens/lilygo_ttgo.c
+    # pico-screens/screens/st7789_240_135.c
+    # pico-screens/screens/ssd1306_70_40.cpp
+    # pico-screens/screens/ssd1306_70_40_i2c.c
+    pico-screens/screens/st7735_128_128.c
 )
 
 pico_set_program_name(piconesPlus "piconesPlus")
 pico_set_program_version(piconesPlus "0.8")
 
-pico_enable_stdio_uart(piconesPlus 1)
+pico_enable_stdio_uart(piconesPlus 0)
 pico_enable_stdio_usb(piconesPlus 0)
 
 # tinyusb
 set(FAMILY rp2040)
 set(BOARD pico_sdk)
-set(TINYUSB_DEBUG_LEVE 0)
+set(TINYUSB_DEBUG_LEVEL 1)
 include(${PICO_TINYUSB_PATH}/hw/bsp/${FAMILY}/family.cmake)
 family_configure_target(piconesPlus)
 
@@ -177,6 +188,44 @@ target_compile_definitions(piconesPlus PRIVATE
     WII_PIN_SDA=${WII_SDA}
     WII_PIN_SCL=${WII_SCL}
     LED_GPIO_PIN=${LED_GPIO_PIN}
+
+    ST7735_128_128=1
+    # DOWNSAMPLING_FACTOR_OUT_OF_100=300
+    DOWNSAMPLING_FACTOR_OUT_OF_100=199
+
+    # hagl-hal stuff
+    
+    HAGL_HAL_USE_SINGLE_BUFFER=1
+
+    # screen-specific
+
+    MIPI_DISPLAY_PIN_DC=1
+    MIPI_DISPLAY_PIN_CS=5
+    MIPI_DISPLAY_PIN_CLK=2 # 18
+    MIPI_DISPLAY_PIN_MOSI=3 # 19
+    MIPI_DISPLAY_PIN_RST=0
+    MIPI_DISPLAY_PIN_BL=22
+    MIPI_DISPLAY_PIN_MISO=-1
+
+    MIPI_DISPLAY_SPI_PORT=spi0
+    MIPI_DISPLAY_SPI_CLOCK_SPEED_HZ=62500000
+    MIPI_DISPLAY_PIXEL_FORMAT=MIPI_DCS_PIXEL_FORMAT_16BIT
+
+    # MIPI_DISPLAY_ADDRESS_MODE=MIPI_DCS_ADDRESS_MODE_BGR|MIPI_DCS_ADDRESS_MODE_MIRROR_Y|MIPI_DCS_ADDRESS_MODE_MIRROR_X
+    # MIPI_DISPLAY_ADDRESS_MODE=MIPI_DCS_ADDRESS_MODE_BGR|MIPI_DCS_ADDRESS_MODE_SWAP_XY|MIPI_DCS_ADDRESS_MODE_MIRROR_Y # this was for 160x80
+    MIPI_DISPLAY_ADDRESS_MODE=MIPI_DCS_ADDRESS_MODE_BGR|MIPI_DCS_ADDRESS_MODE_MIRROR_Y|MIPI_DCS_ADDRESS_MODE_MIRROR_X
+    
+    # MIPI_DISPLAY_WIDTH=160
+    # MIPI_DISPLAY_HEIGHT=80
+    # MIPI_DISPLAY_OFFSET_X=0
+    # MIPI_DISPLAY_OFFSET_Y=26
+
+    MIPI_DISPLAY_WIDTH=128
+    MIPI_DISPLAY_HEIGHT=128
+    MIPI_DISPLAY_OFFSET_X=2
+    MIPI_DISPLAY_OFFSET_Y=1
+
+    MIPI_DISPLAY_INVERT=1
 )
 target_link_libraries(piconesPlus PRIVATE
     pico_stdlib
@@ -194,8 +243,9 @@ target_link_libraries(piconesPlus PRIVATE
     infones
     tinyusb_host
     sdcard
-    fatfs        
-)
+    fatfs
+    pico-screens
+    )
 
     target_include_directories(piconesPlus
     PRIVATE

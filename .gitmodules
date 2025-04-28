@@ -1,3 +1,6 @@
 [submodule "pico_lib"]
 	path = pico_lib
 	url = https://github.com/shuichitakano/pico_lib.git
+[submodule "pico-screens"]
+	path = pico-screens
+	url = https://github.com/rsheldiii/pico-screens.git
