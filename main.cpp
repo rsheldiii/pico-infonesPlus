@@ -27,7 +27,7 @@
 #include <InfoNES_pAPU.h>
 
 #include <dvi/dvi.h>
-#include <dvi/spi_buffer.h>
+#include <pico-screens/spi/spi_buffer.h>
 #include <tusb.h>
 #include <gamepad.h>
 #include "rom_selector.h"

@@ -31,6 +31,7 @@ SET(CMAKE_SHARED_LINKER_FLAGS_RELEASENODEBUG
     ""
     CACHE STRING "Flags used by the shared libraries linker during REL_O2 builds."
     FORCE )
+
 MARK_AS_ADVANCED(
     CMAKE_CXX_FLAGS_RELEASENODEBUG
     CMAKE_ASM_FLAGS_RELEASENODEBUG
@@ -58,12 +59,20 @@ pico_sdk_init()
 add_subdirectory(drivers/fatfs)
 add_subdirectory(drivers/sdcard)
 
+
+# Screen configuration for this hardware
+set(PICO_SCREENS_WIDTH "255" CACHE STRING "Screen width in pixels")
+set(PICO_SCREENS_HEIGHT "240" CACHE STRING "Screen height in pixels") 
+set(PICO_SCREENS_DOWNSAMPLING_FACTOR "199" CACHE STRING "Downsampling factor as percentage")
+
 add_subdirectory(pico-screens)
 # add_subdirectory(pico-screens)
+
 
 if (NOT INFONES_PLUS_HW_CONFIG)
     set(INFONES_PLUS_HW_CONFIG 1 CACHE STRING "Select the hardware configuration for your board")       
 endif()
+
 if ( INFONES_PLUS_HW_CONFIG EQUAL 1 )
 	# This default Config is for Pimoroni Pico DV Demo Base
 	set(DVICONFIG "dviConfig_PimoroniDemoDVSock" CACHE STRING
@@ -127,7 +136,7 @@ elseif ( INFONES_PLUS_HW_CONFIG EQUAL 4 )
     set(NES_DATA "6" CACHE STRING "Select the Data GPIO pin for NES controller")
     set(NES_LAT "9" CACHE STRING "Select the Latch GPIO pin for NES controller")
     set(WII_SDA "-1" CACHE STRING "Select the SDA GPIO pin for Wii Classic controller")
-    set(WII_SCL "-1" CACHE STRING "Select the SCL GPIO pin for Wii Classic controller")
+    set(WII_SCL "-1" CACHE STRING "Select the SCL GPIO pin for Wii Classic controller") 
 endif ( )
 
 # --------------------------------------------------------------------
@@ -190,8 +199,8 @@ target_compile_definitions(piconesPlus PRIVATE
     LED_GPIO_PIN=${LED_GPIO_PIN}
 
     ST7735_128_128=1
-    # DOWNSAMPLING_FACTOR_OUT_OF_100=300
-    DOWNSAMPLING_FACTOR_OUT_OF_100=199
+    # Remove hard-coded DOWNSAMPLING_FACTOR - now defined through pico-screens
+    # DOWNSAMPLING_FACTOR_OUT_OF_100=199
 
     # hagl-hal stuff
     
