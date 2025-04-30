@@ -7,3 +7,6 @@
 [submodule "pico_shared"]
 	path = pico_shared
 	url = https://github.com/fhoedemakers/pico_shared.git
+[submodule "pico-screens"]
+	path = pico-screens
+	url = https://github.com/rsheldiii/pico-screens

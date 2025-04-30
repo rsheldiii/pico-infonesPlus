@@ -140,7 +140,8 @@ target_link_libraries(${projectname} PRIVATE
     infones
     tinyusb_host 
     pico_shared  
-    xinput_host   
+    xinput_host
+    pico-screens
 )
 if(PICO_BOARD STREQUAL "pico_w" OR PICO_BOARD STREQUAL "pico2_w")
     # Attention pico2_w in arm-s or risv-s mode causes the led blinking to generate red screen flicker and
@@ -163,7 +164,16 @@ endif()
     add_subdirectory(pico_lib/util)
     add_subdirectory(pico_shared)
     add_subdirectory(tusb_xinput xinput_host)
-    pico_add_extra_outputs(${projectname})
+
+# Screen configuration
+set(PICO_SCREENS_WIDTH "255" CACHE STRING "Screen width in pixels")
+set(PICO_SCREENS_HEIGHT "240" CACHE STRING "Screen height in pixels") 
+set(PICO_SCREENS_DOWNSAMPLING_FACTOR "199" CACHE STRING "Downsampling factor as percentage")
+
+# Add pico-screens subdirectory
+add_subdirectory(pico-screens)
+
+pico_add_extra_outputs(${projectname})
 
 
 
