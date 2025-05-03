@@ -18,6 +18,7 @@
 #include "FrensHelpers.h"
 #include "settings.h"
 #include "FrensFonts.h"
+#include "nvram.h"
 
 bool isFatalError = false;
 
@@ -45,127 +46,6 @@ const WORD __not_in_flash_func(NesPalette)[64] = {
     CC(0x7fff), CC(0x579f), CC(0x635f), CC(0x6b3f), CC(0x7f1f), CC(0x7f1b), CC(0x7ef6), CC(0x7f75),
     CC(0x7f94), CC(0x73f4), CC(0x57d7), CC(0x5bf9), CC(0x4ffe), CC(0x0000), CC(0x0000), CC(0x0000)};
 
-
-uint32_t getCurrentNVRAMAddr()
-{
-    if (!romSelector_.getCurrentROM())
-    {
-        return {};
-    }
-    int slot = romSelector_.getCurrentNVRAMSlot();
-    if (slot < 0)
-    {
-        return {};
-    }
-    printf("SRAM slot %d\n", slot);
-    return ROM_FILE_ADDR - SRAM_SIZE * (slot + 1);
-}
-
-
-
-void saveNVRAM()
-{
-    char pad[FF_MAX_LFN];
-    char fileName[FF_MAX_LFN];
-    strcpy(fileName, Frens::GetfileNameFromFullPath(romName));
-    Frens::stripextensionfromfilename(fileName);
-    if (!SRAMwritten)
-    {
-        printf("SRAM not updated.\n");
-        return;
-    }
-    snprintf(pad, FF_MAX_LFN, "%s/%s.SAV", GAMESAVEDIR, fileName);
-    printf("Save SRAM to %s\n", pad);
-    FIL fil;
-    FRESULT fr;
-    fr = f_open(&fil, pad, FA_CREATE_ALWAYS | FA_WRITE);
-    if (fr != FR_OK)
-    {
-        snprintf(ErrorMessage, ERRORMESSAGESIZE, "Cannot open save file: %d", fr);
-        printf("%s\n", ErrorMessage);
-        return;
-    }
-    size_t bytesWritten;
-    fr = f_write(&fil, SRAM, SRAM_SIZE, &bytesWritten);
-    if (bytesWritten < SRAM_SIZE)
-    {
-        snprintf(ErrorMessage, ERRORMESSAGESIZE, "Error writing save: %d %d/%d written", fr, bytesWritten, SRAM_SIZE);
-        printf("%s\n", ErrorMessage);
-    }
-    f_close(&fil);
-    printf("done\n");
-    SRAMwritten = false;
-}
-
-bool loadNVRAM()
-{
-    char pad[FF_MAX_LFN];
-    FILINFO fno;
-    bool ok = false;
-    char fileName[FF_MAX_LFN];
-    strcpy(fileName, Frens::GetfileNameFromFullPath(romName));
-    Frens::stripextensionfromfilename(fileName);
-
-    snprintf(pad, FF_MAX_LFN, "%s/%s.SAV", GAMESAVEDIR, fileName);
-
-    FIL fil;
-    FRESULT fr;
-
-    size_t bytesRead;
-    if (auto addr = getCurrentNVRAMAddr())
-    {
-        printf("Load SRAM from %s\n", pad);
-        fr = f_stat(pad, &fno);
-        if (fr == FR_NO_FILE)
-        {
-            printf("Save file not found, load SRAM from flash %x\n", addr);
-            memcpy(SRAM, reinterpret_cast<void *>(addr), SRAM_SIZE);
-            ok = true;
-        }
-        else
-        {
-            if (fr == FR_OK)
-            {
-                printf("Loading save file %s\n", pad);
-                fr = f_open(&fil, pad, FA_READ);
-                if (fr == FR_OK)
-                {
-                    fr = f_read(&fil, SRAM, SRAM_SIZE, &bytesRead);
-                    if (fr == FR_OK)
-                    {
-                        printf("Savefile read from disk\n");
-                        ok = true;
-                    }
-                    else
-                    {
-                        snprintf(ErrorMessage, ERRORMESSAGESIZE, "Cannot read save file: %d %d/%d read", fr, bytesRead, SRAM_SIZE);
-                        printf("%s\n", ErrorMessage);
-                    }
-                }
-                else
-                {
-                    snprintf(ErrorMessage, ERRORMESSAGESIZE, "Cannot open save file: %d", fr);
-                    printf("%s\n", ErrorMessage);
-                }
-                f_close(&fil);
-            }
-            else
-            {
-                snprintf(ErrorMessage, ERRORMESSAGESIZE, "f_stat() failed on save file: %d", fr);
-                printf("%s\n", ErrorMessage);
-            }
-        }
-    }
-    else
-    {
-        ok = true;
-    }
-    SRAMwritten = false;
-    return ok;
-}
-
-
-
 static DWORD prevButtons[2]{};
 static int rapidFireMask[2]{};
 static int rapidFireCounter = 0;
@@ -179,14 +59,6 @@ void InfoNES_PadState(DWORD *pdwPad1, DWORD *pdwPad2, DWORD *pdwSystem)
     static constexpr int START = 1 << 3;
     static constexpr int A = 1 << 0;
     static constexpr int B = 1 << 1;
-
-    // moved variables outside function body because prevButtons gets initialized to 0 everytime the function is called.
-    // This is strange because a static variable inside a function is only initialsed once and retains it's value
-    // throughout different function calls.
-    // Am i missing something?
-    // static DWORD prevButtons[2]{};
-    // static int rapidFireMask[2]{};
-    // static int rapidFireCounter = 0;
 
     ++rapidFireCounter;
     bool reset = false;
@@ -264,21 +136,9 @@ void InfoNES_PadState(DWORD *pdwPad1, DWORD *pdwPad2, DWORD *pdwSystem)
         }
         if (p1 & SELECT)
         {
-            // if (pushed & LEFT)
-            // {
-            //     saveNVRAM();
-            //     romSelector_.prev();
-            //     reset = true;
-            // }
-            // if (pushed & RIGHT)
-            // {
-            //     saveNVRAM();
-            //     romSelector_.next();
-            //     reset = true;
-            // }
             if (pushed & START)
             {
-                saveNVRAM();
+                nvram_save();
                 reset = true;
             }
             if (pushed & A)
@@ -335,8 +195,6 @@ bool parseROM(const uint8_t *nesFile)
 
     nesFile += sizeof(NesHeader);
 
-    memset(SRAM, 0, SRAM_SIZE);
-
     if (NesHeader.byInfo1 & 4)
     {
         memcpy(&SRAM[0x1000], nesFile, 512);
@@ -363,68 +221,7 @@ void InfoNES_ReleaseRom()
     VROM = nullptr;
 }
 
-void InfoNES_SoundInit()
-{
-}
-
-int InfoNES_SoundOpen(int samples_per_sync, int sample_rate)
-{
-    return 0;
-}
-
-void InfoNES_SoundClose()
-{
-}
-
-int __not_in_flash_func(InfoNES_GetSoundBufferSize)()
-{
-    return dvi_->getAudioRingBuffer().getFullWritableSize();
-}
-
-void __not_in_flash_func(InfoNES_SoundOutput)(int samples, BYTE *wave1, BYTE *wave2, BYTE *wave3, BYTE *wave4, BYTE *wave5)
-{
-    while (samples)
-    {
-        auto &ring = dvi_->getAudioRingBuffer();
-        auto n = std::min<int>(samples, ring.getWritableSize());
-        if (!n)
-        {
-            return;
-        }
-        auto p = ring.getWritePointer();
-
-        int ct = n;
-        while (ct--)
-        {
-            int w1 = *wave1++;
-            int w2 = *wave2++;
-            int w3 = *wave3++;
-            int w4 = *wave4++;
-            int w5 = *wave5++;
-            //            w3 = w2 = w4 = w5 = 0;
-            int l = w1 * 6 + w2 * 3 + w3 * 5 + w4 * 3 * 17 + w5 * 2 * 32;
-            int r = w1 * 3 + w2 * 6 + w3 * 5 + w4 * 3 * 17 + w5 * 2 * 32;
-            *p++ = {static_cast<short>(l), static_cast<short>(r)};
-
-            // pulse_out = 0.00752 * (pulse1 + pulse2)
-            // tnd_out = 0.00851 * triangle + 0.00494 * noise + 0.00335 * dmc
-
-            // 0.00851/0.00752 = 1.131648936170213
-            // 0.00494/0.00752 = 0.6569148936170213
-            // 0.00335/0.00752 = 0.4454787234042554
-
-            // 0.00752/0.00851 = 0.8836662749706228
-            // 0.00494/0.00851 = 0.5804935370152762
-            // 0.00335/0.00851 = 0.3936545240893067
-        }
-
-        ring.advanceWritePointer(n);
-        samples -= n;
-    }
-}
-
 extern WORD PC;
-
 
 int InfoNES_LoadFrame()
 {
@@ -559,9 +356,9 @@ bool loadAndReset()
         printf("NES file parse error.\n");
         return false;
     }
-    if (loadNVRAM() == false)
+    if (!nvram_load())
     {
-        return false;
+        printf("NVRAM load failed.\n");
     }
 
     if (InfoNES_Reset() < 0)
@@ -603,12 +400,21 @@ int main()
     isFatalError =  !Frens::initAll(selectedRom, CPUFreqKHz, 4, 4 );
     scaleMode8_7_ = Frens::applyScreenMode(settings.screenMode);
     bool showSplash = true;
+
+    // Initialize NVRAM module after ROMSelector is likely initialized within initAll or similar
+    // We pass the global romName and ErrorMessage buffers
+    nvram_init(&romSelector_, romName, ErrorMessage);
+
     while (true)
     {
         if (strlen(selectedRom) == 0)
         {
             menu("Pico-InfoNES+", ErrorMessage, isFatalError, showSplash, ".nes"); // never returns, but reboots upon selecting a game
         }
+        // romName is now set by menu() or was set previously if returning from InfoNES_Main
+        // Re-initialize NVRAM in case romName changed (selected via menu)
+        nvram_init(&romSelector_, romName, ErrorMessage); // Pass dependencies
+
         printf("Now playing: %s\n", selectedRom);
         romSelector_.init(ROM_FILE_ADDR);
         InfoNES_Main();
