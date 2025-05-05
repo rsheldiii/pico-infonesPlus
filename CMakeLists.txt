@@ -69,6 +69,8 @@ endif()
 # endif()
 set(INFONES_MAPPER_5_ENABLED "0" CACHE STRING "Enable NES Mapper 5")
 
+option(SPI_SCREEN "Build with SPI screen support instead of DVI" ON)
+
 include("pico_shared/BoardConfigs.cmake")
 message("Mapper 5 enabled      : ${INFONES_MAPPER_5_ENABLED}")
 add_executable(${projectname}
@@ -126,6 +128,20 @@ target_compile_definitions(${projectname} PRIVATE
     HW_CONFIG=${HW_CONFIG}
     WIIPAD_I2C=${WIIPAD_I2C}
 )
+
+# Define list for conditional libs
+set(PICO_TARGET_LIBRARIES "")
+
+if(SPI_SCREEN)
+    target_compile_definitions(${projectname} PRIVATE SPI_SCREEN)
+    message(STATUS "Building with SPI Screen support")
+    # Link pico-screens only when SPI_SCREEN is enabled
+    list(APPEND PICO_TARGET_LIBRARIES pico-screens)
+else()
+    message(STATUS "Building with DVI Screen support")
+    # DVI library is already in the main list
+endif()
+
 target_link_libraries(${projectname} PRIVATE
     pico_stdlib
     pico_multicore
@@ -143,7 +159,7 @@ target_link_libraries(${projectname} PRIVATE
     tinyusb_host 
     pico_shared  
     xinput_host
-    pico-screens
+    ${PICO_TARGET_LIBRARIES}
 )
 if(PICO_BOARD STREQUAL "pico_w" OR PICO_BOARD STREQUAL "pico2_w")
     # Attention pico2_w in arm-s or risv-s mode causes the led blinking to generate red screen flicker and
@@ -172,8 +188,10 @@ set(PICO_SCREENS_WIDTH "255" CACHE STRING "Screen width in pixels")
 set(PICO_SCREENS_HEIGHT "240" CACHE STRING "Screen height in pixels") 
 set(PICO_SCREENS_DOWNSAMPLING_FACTOR "199" CACHE STRING "Downsampling factor as percentage")
 
-# Add pico-screens subdirectory
-add_subdirectory(pico-screens)
+# Add pico-screens subdirectory only if SPI_SCREEN is enabled
+if(SPI_SCREEN)
+    add_subdirectory(pico-screens)
+endif()
 
 pico_add_extra_outputs(${projectname})
 
