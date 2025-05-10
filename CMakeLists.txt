@@ -70,6 +70,11 @@ endif()
 set(INFONES_MAPPER_5_ENABLED "0" CACHE STRING "Enable NES Mapper 5")
 
 option(SPI_SCREEN "Build with SPI screen support instead of DVI" ON)
+# bricks otherwise
+SET(NES_CLK "-1" CACHE STRING "Select the Clock GPIO pin for NES controller")
+SET(NES_CLK_1 "-1" CACHE STRING "Select the Clock GPIO pin for second NES controller")
+SET(WII_SDA "-1" CACHE STRING "Select the SDA GPIO pin for Wii Classic controller")
+SET(WII_SCL "-1" CACHE STRING "Select the SCL GPIO pin for Wii Classic controller")
 
 include("pico_shared/BoardConfigs.cmake")
 message("Mapper 5 enabled      : ${INFONES_MAPPER_5_ENABLED}")
@@ -127,19 +132,26 @@ target_compile_definitions(${projectname} PRIVATE
     NES_MAPPER_5_ENABLED=${INFONES_MAPPER_5_ENABLED}
     HW_CONFIG=${HW_CONFIG}
     WIIPAD_I2C=${WIIPAD_I2C}
+
+    # --- STDIO Configuration ---
+    PICO_DEFAULT_UART=1          # Use UART1 for stdio
+    PICO_DEFAULT_UART_TX_PIN=24 # Use GPIO 24 for UART1 TX
+    PICO_DEFAULT_UART_RX_PIN=25 # Use GPIO 25 for UART1 RX
 )
 
 # Define list for conditional libs
 set(PICO_TARGET_LIBRARIES "")
 
 if(SPI_SCREEN)
-    target_compile_definitions(${projectname} PRIVATE SPI_SCREEN)
+    # Add the definition globally for this build configuration
+    add_compile_definitions(SPI_SCREEN)
     message(STATUS "Building with SPI Screen support")
     # Link pico-screens only when SPI_SCREEN is enabled
     list(APPEND PICO_TARGET_LIBRARIES pico-screens)
 else()
     message(STATUS "Building with DVI Screen support")
-    # DVI library is already in the main list
+    # Link dvi library only when SPI_SCREEN is disabled
+    list(APPEND PICO_TARGET_LIBRARIES dvi)
 endif()
 
 target_link_libraries(${projectname} PRIVATE
@@ -153,7 +165,6 @@ target_link_libraries(${projectname} PRIVATE
     hardware_clocks
     hardware_pwm
     hardware_flash
-    dvi
     util
     infones
     tinyusb_host 
@@ -191,6 +202,27 @@ set(PICO_SCREENS_DOWNSAMPLING_FACTOR "199" CACHE STRING "Downsampling factor as 
 # Add pico-screens subdirectory only if SPI_SCREEN is enabled
 if(SPI_SCREEN)
     add_subdirectory(pico-screens)
+    # Add definitions to the pico-screens target itself
+    target_compile_definitions(pico-screens INTERFACE
+        ST7735_128_128=1
+        HAGL_HAL_USE_SINGLE_BUFFER=1
+        MIPI_DISPLAY_PIN_DC=1
+        MIPI_DISPLAY_PIN_CS=5
+        MIPI_DISPLAY_PIN_CLK=2
+        MIPI_DISPLAY_PIN_MOSI=3
+        MIPI_DISPLAY_PIN_RST=0
+        MIPI_DISPLAY_PIN_BL=22
+        MIPI_DISPLAY_PIN_MISO=-1
+        MIPI_DISPLAY_SPI_PORT=spi0
+        MIPI_DISPLAY_SPI_CLOCK_SPEED_HZ=62500000
+        MIPI_DISPLAY_PIXEL_FORMAT=MIPI_DCS_PIXEL_FORMAT_16BIT
+        MIPI_DISPLAY_ADDRESS_MODE=MIPI_DCS_ADDRESS_MODE_BGR|MIPI_DCS_ADDRESS_MODE_MIRROR_Y|MIPI_DCS_ADDRESS_MODE_MIRROR_X
+        MIPI_DISPLAY_WIDTH=128
+        MIPI_DISPLAY_HEIGHT=128
+        MIPI_DISPLAY_OFFSET_X=2
+        MIPI_DISPLAY_OFFSET_Y=1
+        MIPI_DISPLAY_INVERT=1
+    )
 endif()
 
 pico_add_extra_outputs(${projectname})

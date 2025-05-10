@@ -33,7 +33,13 @@ constexpr uint32_t CPUFreqKHz = 252000;
 namespace
 {
     ROMSelector romSelector_;
-}   
+}
+
+#ifdef SPI_SCREEN
+#define INFONES_LINE_BUFFER_OFFSET 0
+#else
+#define INFONES_LINE_BUFFER_OFFSET 32
+#endif
 
 #define CC(x) (((x >> 1) & 15) | (((x >> 6) & 15) << 4) | (((x >> 11) & 15) << 8))
 const WORD __not_in_flash_func(NesPalette)[64] = {
@@ -296,7 +302,7 @@ void __not_in_flash_func(InfoNES_PreDrawLine)(int line)
     // WORD = 2 bytes
     // b->size = 640
     // printf("%d\n", b->size());
-    InfoNES_SetLineBuffer(b->data() + 32, b->size());
+    InfoNES_SetLineBuffer(b->data() + INFONES_LINE_BUFFER_OFFSET, b->size());
     //    (*b)[319] = line + dvi_->getFrameCounter();
 
     currentLineBuffer_ = b;
@@ -404,6 +410,13 @@ int main()
     // Initialize NVRAM module after ROMSelector is likely initialized within initAll or similar
     // We pass the global romName and ErrorMessage buffers
     nvram_init(&romSelector_, romName, ErrorMessage);
+
+    dvi::DVI::LineBuffer debug_linebuffer(SCREENWIDTH);
+    std::fill(debug_linebuffer.begin(), debug_linebuffer.end(), 0b0000000000011111);
+    for (uint8_t i = 0; i < SCREENHEIGHT; i++) {
+        dvi_->setLineBuffer(i, &debug_linebuffer);
+    }
+    sleep_ms(250);
 
     while (true)
     {

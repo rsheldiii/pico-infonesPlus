@@ -1,7 +1,7 @@
 #include "audio.h"
 #include "pico/stdlib.h" // Included for __not_in_flash_func if needed, though might be indirect
 #include "FrensHelpers.h" // Provides the global dvi_ pointer
-#include "dvi.h"          // Provides the dvi::DVI class definition
+#include "screen_output.h"          // Provides the dvi::DVI class definition
 #include <algorithm>    // For std::min
 
 // --- Implementation of InfoNES Sound API ---
