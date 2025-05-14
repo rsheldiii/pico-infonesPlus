@@ -71,7 +71,7 @@ set(INFONES_MAPPER_5_ENABLED "0" CACHE STRING "Enable NES Mapper 5")
 
 option(SPI_SCREEN "Build with SPI screen support instead of DVI" ON)
 # bricks otherwise
-SET(NES_CLK "-1" CACHE STRING "Select the Clock GPIO pin for NES controller")
+SET(NES_CLK "10" CACHE STRING "Select the Clock GPIO pin for NES controller")
 SET(NES_CLK_1 "-1" CACHE STRING "Select the Clock GPIO pin for second NES controller")
 SET(WII_SDA "-1" CACHE STRING "Select the SDA GPIO pin for Wii Classic controller")
 SET(WII_SCL "-1" CACHE STRING "Select the SCL GPIO pin for Wii Classic controller")
@@ -204,16 +204,18 @@ if(SPI_SCREEN)
     add_subdirectory(pico-screens)
     # Add definitions to the pico-screens target itself
     target_compile_definitions(pico-screens INTERFACE
+        # TODO REMEMBER DC=1 CS=5 CLK=2 MOSI=3 RST=0 BL=22 MISO=-1 FOR SPI0
+        # setting to different values to avoid conflicts with sdcard
         ST7735_128_128=1
         HAGL_HAL_USE_SINGLE_BUFFER=1
         MIPI_DISPLAY_PIN_DC=1
-        MIPI_DISPLAY_PIN_CS=5
-        MIPI_DISPLAY_PIN_CLK=2
-        MIPI_DISPLAY_PIN_MOSI=3
+        MIPI_DISPLAY_PIN_CS=13
+        MIPI_DISPLAY_PIN_CLK=14
+        MIPI_DISPLAY_PIN_MOSI=27
         MIPI_DISPLAY_PIN_RST=0
         MIPI_DISPLAY_PIN_BL=22
         MIPI_DISPLAY_PIN_MISO=-1
-        MIPI_DISPLAY_SPI_PORT=spi0
+        MIPI_DISPLAY_SPI_PORT=spi1
         MIPI_DISPLAY_SPI_CLOCK_SPEED_HZ=62500000
         MIPI_DISPLAY_PIXEL_FORMAT=MIPI_DCS_PIXEL_FORMAT_16BIT
         MIPI_DISPLAY_ADDRESS_MODE=MIPI_DCS_ADDRESS_MODE_BGR|MIPI_DCS_ADDRESS_MODE_MIRROR_Y|MIPI_DCS_ADDRESS_MODE_MIRROR_X

@@ -25,6 +25,9 @@ void InfoNES_SoundClose()
 // Place in RAM because it's called often from the sound generation loop
 int __not_in_flash_func(InfoNES_GetSoundBufferSize)()
 {
+#ifdef SPI_SCREEN
+    return 0;
+#endif
     // Requires dvi_
     if (!dvi_) return 0; // Safety check
     return dvi_->getAudioRingBuffer().getFullWritableSize();
@@ -33,6 +36,9 @@ int __not_in_flash_func(InfoNES_GetSoundBufferSize)()
 // Place in RAM because it's called often from the sound generation loop
 void __not_in_flash_func(InfoNES_SoundOutput)(int samples, BYTE *wave1, BYTE *wave2, BYTE *wave3, BYTE *wave4, BYTE *wave5)
 {
+#ifdef SPI_SCREEN
+    return;
+#endif
     // Requires dvi_
     if (!dvi_) return; // Safety check
 

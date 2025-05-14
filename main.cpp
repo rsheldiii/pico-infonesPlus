@@ -35,11 +35,11 @@ namespace
     ROMSelector romSelector_;
 }
 
-#ifdef SPI_SCREEN
-#define INFONES_LINE_BUFFER_OFFSET 0
-#else
-#define INFONES_LINE_BUFFER_OFFSET 32
-#endif
+dvi::DVI::LineBuffer debug_linebuffer(SCREENWIDTH);
+
+
+#define INFONES_LINE_BUFFER_OFFSET 32 // was 0, but I think that's maybe wrong?
+
 
 #define CC(x) (((x >> 1) & 15) | (((x >> 6) & 15) << 4) | (((x >> 11) & 15) << 8))
 const WORD __not_in_flash_func(NesPalette)[64] = {
@@ -183,6 +183,7 @@ void InfoNES_MessageBox(const char *pszMsg, ...)
 
 void InfoNES_Error(const char *pszMsg, ...)
 {
+
     printf("[Error]");
     va_list args;
     va_start(args, pszMsg);
@@ -294,6 +295,7 @@ void __not_in_flash_func(drawWorkMeter)(int line)
 
 void __not_in_flash_func(InfoNES_PreDrawLine)(int line)
 {
+
     util::WorkMeterMark(0xaaaa);
     auto b = dvi_->getLineBuffer();
     util::WorkMeterMark(0x5555);
@@ -343,6 +345,7 @@ void __not_in_flash_func(InfoNES_PostDrawLine)(int line)
             }
         }
     }
+
     assert(currentLineBuffer_);
     dvi_->setLineBuffer(line, currentLineBuffer_);
     currentLineBuffer_ = nullptr;
@@ -354,22 +357,42 @@ bool loadAndReset()
     if (!rom)
     {
         printf("ROM does not exists.\n");
+                        std::fill(debug_linebuffer.begin(), debug_linebuffer.end(), 0b1010101010101010);
+        for (uint8_t i = 0; i < SCREENHEIGHT; i++) {
+            dvi_->setLineBuffer(i, &debug_linebuffer);
+        }
+        sleep_ms(10000);
         return false;
     }
 
     if (!parseROM(rom))
     {
         printf("NES file parse error.\n");
+        std::fill(debug_linebuffer.begin(), debug_linebuffer.end(), 0b0000011111110000);
+        for (uint8_t i = 0; i < SCREENHEIGHT; i++) {
+            dvi_->setLineBuffer(i, &debug_linebuffer);
+        }
+        sleep_ms(10000);
         return false;
     }
     if (!nvram_load())
     {
         printf("NVRAM load failed.\n");
+        std::fill(debug_linebuffer.begin(), debug_linebuffer.end(), 0b0000000000111111);
+        for (uint8_t i = 0; i < SCREENHEIGHT; i++) {
+            dvi_->setLineBuffer(i, &debug_linebuffer);
+        }
+        sleep_ms(10000);
     }
 
     if (InfoNES_Reset() < 0)
     {
         printf("NES reset error.\n");
+        std::fill(debug_linebuffer.begin(), debug_linebuffer.end(), 0b1111111111111111);
+        for (uint8_t i = 0; i < SCREENHEIGHT; i++) {
+            dvi_->setLineBuffer(i, &debug_linebuffer);
+        }
+        sleep_ms(10000);
         return false;
     }
 
@@ -411,13 +434,6 @@ int main()
     // We pass the global romName and ErrorMessage buffers
     nvram_init(&romSelector_, romName, ErrorMessage);
 
-    dvi::DVI::LineBuffer debug_linebuffer(SCREENWIDTH);
-    std::fill(debug_linebuffer.begin(), debug_linebuffer.end(), 0b0000000000011111);
-    for (uint8_t i = 0; i < SCREENHEIGHT; i++) {
-        dvi_->setLineBuffer(i, &debug_linebuffer);
-    }
-    sleep_ms(250);
-
     while (true)
     {
         if (strlen(selectedRom) == 0)
@@ -426,11 +442,23 @@ int main()
         }
         // romName is now set by menu() or was set previously if returning from InfoNES_Main
         // Re-initialize NVRAM in case romName changed (selected via menu)
+    std::fill(debug_linebuffer.begin(), debug_linebuffer.end(), 0b0101001000111111);
+    for (uint8_t i = 0; i < SCREENHEIGHT; i++) {
+        dvi_->setLineBuffer(i, &debug_linebuffer);
+    }
+    sleep_ms(1000);
+
         nvram_init(&romSelector_, romName, ErrorMessage); // Pass dependencies
+
 
         printf("Now playing: %s\n", selectedRom);
         romSelector_.init(ROM_FILE_ADDR);
         InfoNES_Main();
+        std::fill(debug_linebuffer.begin(), debug_linebuffer.end(), 0b0000000000000000);
+        for (uint8_t i = 0; i < SCREENHEIGHT; i++) {
+            dvi_->setLineBuffer(i, &debug_linebuffer);
+        }
+        sleep_ms(1000);
         selectedRom[0] = 0;
         showSplash = false;
     }
