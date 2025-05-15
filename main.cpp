@@ -346,7 +346,7 @@ void __not_in_flash_func(InfoNES_PostDrawLine)(int line)
     }
 
     assert(currentLineBuffer_);
-    dvi_->setLineBuffer(line, currentLineBuffer_);
+    dvi_->setLineBuffer(line-4, currentLineBuffer_);
     currentLineBuffer_ = nullptr;
 }
 
