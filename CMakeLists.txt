@@ -133,10 +133,10 @@ target_compile_definitions(${projectname} PRIVATE
     HW_CONFIG=${HW_CONFIG}
     WIIPAD_I2C=${WIIPAD_I2C}
 
-    # --- STDIO Configuration ---
-    PICO_DEFAULT_UART=1          # Use UART1 for stdio
-    PICO_DEFAULT_UART_TX_PIN=24 # Use GPIO 24 for UART1 TX
-    PICO_DEFAULT_UART_RX_PIN=25 # Use GPIO 25 for UART1 RX
+    # # --- STDIO Configuration ---
+    # PICO_DEFAULT_UART=1          # Use UART1 for stdio
+    # PICO_DEFAULT_UART_TX_PIN=24 # Use GPIO 24 for UART1 TX
+    # PICO_DEFAULT_UART_RX_PIN=25 # Use GPIO 25 for UART1 RX
 )
 
 # Define list for conditional libs
@@ -208,11 +208,11 @@ if(SPI_SCREEN)
         # setting to different values to avoid conflicts with sdcard
         ST7735_128_128=1
         HAGL_HAL_USE_SINGLE_BUFFER=1
-        MIPI_DISPLAY_PIN_DC=1
+        MIPI_DISPLAY_PIN_DC=5
         MIPI_DISPLAY_PIN_CS=13
         MIPI_DISPLAY_PIN_CLK=14
         MIPI_DISPLAY_PIN_MOSI=27
-        MIPI_DISPLAY_PIN_RST=0
+        MIPI_DISPLAY_PIN_RST=3
         MIPI_DISPLAY_PIN_BL=22
         MIPI_DISPLAY_PIN_MISO=-1
         MIPI_DISPLAY_SPI_PORT=spi1
