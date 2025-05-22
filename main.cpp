@@ -413,6 +413,22 @@ int main()
     // We pass the global romName and ErrorMessage buffers
     nvram_init(&romSelector_, romName, ErrorMessage);
 
+#if defined(BOOT_FROM_FLASH_ROM) && defined(STATIC_ROM_IN_FLASH)
+    printf("BOOT_FROM_FLASH_ROM & STATIC_ROM_IN_FLASH: Booting directly into ROM.\n");
+    strcpy(selectedRom, "STATIC_FLASH_ROM"); // Placeholder name
+    // ROM is already in flash, skip menu and SD card interactions.
+    // Proceed directly to InfoNES_Main
+    printf("Now playing: %s\n", selectedRom);
+    romSelector_.init(ROM_FILE_ADDR); // ROM_FILE_ADDR should be set by FrensHelpers::initAll
+    InfoNES_Main();
+    // After InfoNES_Main finishes (e.g., user quits game), what should happen?
+    // For now, we'll just enter an infinite loop to prevent further execution.
+    // Or, perhaps, a watchdog reboot if that's preferred.
+    printf("Game session ended. Halting system.\n");
+    watchdog_enable(100, 1);
+    while(1) { tight_loop_contents(); };
+#else
+    // Original program flow
     while (true)
     {
         if (strlen(selectedRom) == 0)
@@ -431,6 +447,7 @@ int main()
         selectedRom[0] = 0;
         showSplash = false;
     }
+#endif
 
     return 0;
 }

@@ -229,5 +229,31 @@ endif()
 
 pico_add_extra_outputs(${projectname})
 
+# Add these lines, for example, near other options or project definitions
+
+option(STATIC_ROM_IN_FLASH "Use a predefined static address for ROM in flash" ON)
+option(BOOT_FROM_FLASH_ROM "Boot directly from the ROM in flash (requires STATIC_ROM_IN_FLASH)" ON)
+
+if(STATIC_ROM_IN_FLASH)
+    add_compile_definitions(STATIC_ROM_IN_FLASH)
+    message(STATUS "Building with STATIC_ROM_IN_FLASH enabled. ROM_FILE_ADDR will be static.")
+endif()
+
+if(BOOT_FROM_FLASH_ROM)
+    if(NOT STATIC_ROM_IN_FLASH)
+        message(WARNING "BOOT_FROM_FLASH_ROM is enabled, but STATIC_ROM_IN_FLASH is not. BOOT_FROM_FLASH_ROM will have no effect without a static ROM address.")
+    else()
+        add_compile_definitions(BOOT_FROM_FLASH_ROM)
+        message(STATUS "Building with BOOT_FROM_FLASH_ROM enabled. Will attempt to boot directly from flash.")
+    endif()
+endif()
+
+# If you have target_compile_definitions, you might prefer to add them there, for example:
+# target_compile_definitions(your_target_name PRIVATE
+#     $<$<BOOL:${SPI_SCREEN}>:SPI_SCREEN>
+#     $<$<BOOL:${STATIC_ROM_IN_FLASH}>:STATIC_ROM_IN_FLASH>
+#     $<$<AND:$<BOOL:${BOOT_FROM_FLASH_ROM}>,$<BOOL:${STATIC_ROM_IN_FLASH}>>:BOOT_FROM_FLASH_ROM>
+# )
+
 
 
