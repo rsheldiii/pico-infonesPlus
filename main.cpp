@@ -5,6 +5,7 @@
 #include "hardware/clocks.h"
 #include "hardware/vreg.h"
 #include "hardware/watchdog.h"
+#include "hardware/gpio.h"
 #include "util/work_meter.h"
 #include "InfoNES.h"
 #include "InfoNES_System.h"
@@ -30,6 +31,10 @@ static uint32_t start_tick_us = 0;
 static uint32_t fps = 0;
 
 constexpr uint32_t CPUFreqKHz = 252000;
+
+// Slow motion button on GPIO17
+constexpr uint32_t SLOW_MOTION_GPIO = 17;
+constexpr uint32_t SLOW_MOTION_DELAY_US = 16667; // ~1/60th of a second
 
 namespace
 {
@@ -242,6 +247,13 @@ int InfoNES_LoadFrame()
     nespad_read_finish(); // Sets global nespad_state var
 #endif
     tuh_task();
+
+    // Check for slow motion button and add delay if pressed
+    if (!gpio_get(SLOW_MOTION_GPIO)) {
+        // Add delay to slow down emulation
+        sleep_us(SLOW_MOTION_DELAY_US);
+    }
+
     // Frame rate calculation
     if (fps_enabled)
     {
@@ -408,6 +420,13 @@ int main()
 
     stdio_init_all();
     printf("Start program\n");
+
+    // Initialize slow motion button GPIO
+    gpio_init(SLOW_MOTION_GPIO);
+    gpio_set_dir(SLOW_MOTION_GPIO, GPIO_IN);
+    gpio_pull_up(SLOW_MOTION_GPIO);
+    printf("Slow motion button initialized on GPIO%d\n", SLOW_MOTION_GPIO);
+
     printf("CPU freq: %d\n", clock_get_hz(clk_sys));
     printf("Starting Tinyusb subsystem\n");
     tusb_init();
