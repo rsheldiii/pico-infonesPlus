@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <cstdarg>
 #include "pico/stdlib.h"
 #include "hardware/divider.h"
 #include "hardware/clocks.h"
@@ -394,6 +395,16 @@ int main()
     vreg_set_voltage(VREG_VOLTAGE_1_20);
     sleep_ms(10);
     set_sys_clock_khz(CPUFreqKHz, true);
+    sleep_ms(100);
+    // Get the processor sys_clk frequency in Hz
+     uint32_t freq = clock_get_hz(clk_sys);
+
+    // clk_peri does not have a divider, so input and output frequencies will be the same
+    clock_configure(clk_peri,
+                        0,
+                        CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLK_SYS,
+                        freq,
+                        freq);
 
     stdio_init_all();
     printf("Start program\n");
