@@ -43,10 +43,15 @@ namespace
 
 #define INFONES_LINE_BUFFER_OFFSET 0 // was 32, but I think that's maybe wrong?
 
-// this is to crush RGB555 into RGB444
-// #define CC(x) (((x >> 1) & 15) | (((x >> 6) & 15) << 4) | (((x >> 11) & 15) << 8))
-// this is to expand RGB555 into RGB565. it might not be very accurate
-#define CC(x) ((((x) & 0x7C00) << 1) | (((x) & 0x03E0) << 1) | ((x) & 0x001F))
+// Convert RGB555 to RGB565 with proper bit expansion
+// RGB555: 0RRRRR GGGGG BBBBB -> RGB565: RRRRR GGGGGG BBBBB
+// Red and Blue stay 5 bits, Green expands from 5 to 6 by replicating MSB
+#define CC(x) ( \
+    (((x) & 0x7C00) << 1) | /* Red: bits 14-10 -> 15-11 */ \
+    (((x) & 0x03E0) << 1) | /* Green: bits 9-5 -> 10-6 */ \
+    (((x) & 0x0200) >> 4) | /* Green MSB: bit 9 -> 5 */ \
+    ((x) & 0x001F)          /* Blue: bits 4-0 stay */ \
+)
 const WORD __not_in_flash_func(NesPalette)[64] = {
     CC(0x39ce), CC(0x1071), CC(0x0015), CC(0x2013), CC(0x440e), CC(0x5402), CC(0x5000), CC(0x3c20),
     CC(0x20a0), CC(0x0100), CC(0x0140), CC(0x00e2), CC(0x0ceb), CC(0x0000), CC(0x0000), CC(0x0000),
