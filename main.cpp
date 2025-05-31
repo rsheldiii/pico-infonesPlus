@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <cstdarg>
+#include <algorithm>
 #include "pico/stdlib.h"
 #include "hardware/divider.h"
 #include "hardware/clocks.h"
@@ -238,7 +239,14 @@ void InfoNES_ReleaseRom()
     VROM = nullptr;
 }
 
+// InfoNES_Wait implementation for slow motion control
+// Removed - using InfoNES_LoadFrame instead to avoid redefinition
+
 extern WORD PC;
+
+// Frame timing - ~60.0988 FPS in microseconds
+constexpr uint32_t FRAME_TIME_US = 16639;
+static uint32_t next_frame_time_us = 0;
 
 int InfoNES_LoadFrame()
 {
@@ -253,19 +261,33 @@ int InfoNES_LoadFrame()
 #endif
     tuh_task();
 
-    // Check for slow motion button and add delay if pressed
-    if (!gpio_get(SLOW_MOTION_GPIO)) {
-        // Add delay to slow down emulation
-        sleep_us(SLOW_MOTION_DELAY_US);
+    // Frame rate limiting
+    uint32_t current_time_us = Frens::time_us();
+
+    // Wait until it's time for the next frame
+    while (current_time_us < next_frame_time_us) {
+        // Check for slow motion during wait
+        if (!gpio_get(SLOW_MOTION_GPIO)) {
+            sleep_us(SLOW_MOTION_DELAY_US);
+            // Reset timing when slow motion is active
+            next_frame_time_us = Frens::time_us() + FRAME_TIME_US;
+            break;
+        }
+        current_time_us = Frens::time_us();
+        tight_loop_contents();
     }
 
-    // Frame rate calculation
+    // Schedule next frame (or catch up if we're behind)
+    next_frame_time_us = std::max(next_frame_time_us + FRAME_TIME_US,
+                                  current_time_us + FRAME_TIME_US - FRAME_TIME_US);
+
+    // Frame rate calculation (if enabled)
     if (fps_enabled)
     {
         // calculate fps and round to nearest value (instead of truncating/floor)
-        uint32_t tick_us = Frens::time_us() - start_tick_us;
+        uint32_t tick_us = current_time_us - start_tick_us;
         fps = (1000000 - 1) / tick_us + 1;
-        start_tick_us = Frens::time_us();
+        start_tick_us = current_time_us;
     }
     return count;
 }
