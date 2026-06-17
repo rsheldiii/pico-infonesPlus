@@ -20,6 +20,9 @@ for HWCONFIG in $HWCONFIGS
 do	
 	./bld.sh -c $HWCONFIG
 done
+# NES earrings config (RP2354A) also builds for RP2040 (plain pico, 2MB) for
+# backwards-compatibility / breadboarding on a bare RP2040.
+./bld.sh -c 6
 # build for Pico w
 HWCONFIGS="1 2"
 for HWCONFIG in $HWCONFIGS
@@ -36,6 +39,8 @@ do
 		./bld.sh -c $HWCONFIG -2 -w
 	fi
 done
+# build the NES earrings (RP2354A, custom 2MB board file) for rp2350-arm-s
+./bld.sh -c 6 -2 -b earrings_rp2354
 # build for Pico 2 -riscv, Metro RP2350 has no risc support because sd card not working
 HWCONFIGS="1 2"
 #HWCONFIGS="1 2 5"

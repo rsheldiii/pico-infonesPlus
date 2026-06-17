@@ -46,6 +46,11 @@ ENDIF(NOT CMAKE_BUILD_TYPE)
 message("* Current build type is : ${CMAKE_BUILD_TYPE}")
 
 add_definitions( -DNDEBUG )
+
+# Allow project-local board definitions (e.g. boards/earrings_rp2354.h).
+# Must be set before pico_sdk_init() so the SDK can resolve a custom PICO_BOARD.
+list(APPEND PICO_BOARD_HEADER_DIRS "${CMAKE_CURRENT_LIST_DIR}/boards")
+
 include(pico_sdk_import.cmake)
 
 project(${projectname} C CXX ASM)
