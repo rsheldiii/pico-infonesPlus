@@ -273,8 +273,12 @@ int InfoNES_LoadFrame()
             next_frame_time_us = Frens::time_us() + FRAME_TIME_US;
             break;
         }
+        // Service USB instead of idle-spinning: drains completed gamepad
+        // reports and re-arms the next IN transfer immediately, so the device
+        // is polled repeatedly within the frame and gp.buttons is fresh when
+        // InfoNES_PadState() latches on the next scanline.
+        tuh_task();
         current_time_us = Frens::time_us();
-        tight_loop_contents();
     }
 
     // Schedule next frame (or catch up if we're behind)
